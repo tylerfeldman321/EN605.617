@@ -24,7 +24,7 @@ wget -O cuda-keyring_1.1-1_all.deb https://developer.download.nvidia.com/compute
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt-get update
 sudo apt-get install cuda-toolkit
-sudo reboot
+# sudo reboot
 
 # Post-installation actions
 export PATH=/usr/local/cuda-12.8/bin${PATH:+:${PATH}}
@@ -49,7 +49,7 @@ wget -O cuda-keyring_1.1-1_all.deb https://developer.download.nvidia.com/compute
 sudo dpkg -i cuda-keyring_1.1-1_all.deb
 sudo apt-get update
 sudo apt install nvidia-open -y
-sudo reboot
+# sudo reboot
 
 # ===========================================================
 # https://github.com/KhronosGroup/OpenCL-Guide/blob/main/chapters/getting_started_linux.md
