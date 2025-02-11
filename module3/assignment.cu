@@ -29,7 +29,43 @@ void add(int *result, int *a, int *b, int N)
   for(int i = index; i < N; i += stride)
   {
     result[i] = a[i] + b[i];
-	printf("Result[%d]: %d = %d + %d\n", i, result[i], a[i], b[i]);
+	// printf("Result[%d]: %d = %d + %d\n", i, result[i], a[i], b[i]);
+  }
+}
+
+__global__
+void subtract(int *result, int *a, int *b, int N)
+{
+  int index = threadIdx.x + blockIdx.x * blockDim.x;
+  int stride = blockDim.x * gridDim.x;
+  for(int i = index; i < N; i += stride)
+  {
+    result[i] = a[i] - b[i];
+	// printf("Result[%d]: %d = %d + %d\n", i, result[i], a[i], b[i]);
+  }
+}
+
+__global__
+void multiply(int *result, int *a, int *b, int N)
+{
+  int index = threadIdx.x + blockIdx.x * blockDim.x;
+  int stride = blockDim.x * gridDim.x;
+  for(int i = index; i < N; i += stride)
+  {
+    result[i] = a[i] * b[i];
+	// printf("Result[%d]: %d = %d + %d\n", i, result[i], a[i], b[i]);
+  }
+}
+
+__global__
+void mod(int *result, int *a, int *b, int N)
+{
+  int index = threadIdx.x + blockIdx.x * blockDim.x;
+  int stride = blockDim.x * gridDim.x;
+  for(int i = index; i < N; i += stride)
+  {
+    result[i] = a[i] % b[i];
+	// printf("Result[%d]: %d = %d mod %d\n", i, result[i], a[i], b[i]);
   }
 }
 
@@ -83,15 +119,11 @@ int main(int argc, char** argv)
 	cudaMemcpy( gpu_a, cpu_a, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
 	cudaMemcpy( gpu_b, cpu_b, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
 
-	add<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
+	subtract<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
 	checkCuda( cudaGetLastError() );
 	checkCuda( cudaDeviceSynchronize() );
 
 	checkCuda( cudaMemcpy( cpu_result, gpu_result, ARRAY_SIZE_IN_BYTES, cudaMemcpyDeviceToHost ) );
-
-	printf("Result value at index 0: %d\n", cpu_result[0]);
-	printf("Result value at index 1: %d\n", cpu_result[1]);
-	printf("Result value at index 2: %d\n", cpu_result[2]);
 
 	checkCuda( cudaFree(gpu_a) );
 	checkCuda( cudaFree(gpu_b) );
