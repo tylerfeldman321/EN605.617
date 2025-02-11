@@ -2,6 +2,8 @@
 
 ## Results of the Math Operations
 
+Run `make run_math_operations` for these results.
+
 ### Results of Add Operation
 ```bash
 ubuntu@ip-172-31-77-247:~/EN605.617/module3$ make assignment && ./assignment.exe 1024 256 add
@@ -71,12 +73,23 @@ Result[4]: -1, A[4]: 4, B[4], 0
 ```
 
 ## Effects of Conditional Branching in CUDA
-- Create a program that demonstrates the effect of conditional branching in CUDA 
-kernels executing similar algorithms. Some charts and result description is 
-required as well.
-- Use two additional numbers of threads
-- Use two additional block sizes
-- Include at least one performance comparison chart and a short text file that includes your thoughts on the results.
+
+Run `make profile` for these results.
+
+| Number of Threads | Block Size | Conditional Branching | Elapsed Time (ns) |
+|-------------------|------------|-----------------------|-------------------|
+| 1048576           | 256        | False                 | 32049             |
+| 1048576           | 256        | True                  | 44463             |
+| 524288            | 256        | False                 | 34299             |
+| 524288            | 256        | True                  | 41101             |
+| 262144            | 256        | False                 | 23841             |
+| 262144            | 256        | True                  | 36135             |
+| 1048576           | 128        | False                 | 35944             |
+| 1048576           | 128        | True                  | 51039             |
+| 1048576           | 32         | False                 | 119917            |
+| 1048576           | 32         | True                  | 123200            |
+
+Based on the results above, we can see that the conditional branching kernel performs significantly worse in terms of runtime than the non branching kernels. This is true for the five total combinations of threads and block sizes. This shows the importance of avoiding stalls and branching within kernels.
 
 ## Stretch Problem
 **The good:**

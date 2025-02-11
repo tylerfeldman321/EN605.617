@@ -7,13 +7,13 @@
 #include <algorithm>
 using namespace std;
 
-#define ARRAY_SIZE 1024
+#define ARRAY_SIZE 20480
 #define ARRAY_SIZE_IN_BYTES (sizeof(int) * (ARRAY_SIZE))
 
 int cpu_a[ARRAY_SIZE];
 int cpu_b[ARRAY_SIZE];
 int cpu_result[ARRAY_SIZE];
-bool verbose = true;
+bool verbose = false;
 
 inline cudaError_t checkCuda(cudaError_t result)
 {
@@ -22,40 +22,6 @@ inline cudaError_t checkCuda(cudaError_t result)
     assert(result == cudaSuccess);
   }
   return result;
-}
-
-
-void sortByParity(int *a, int *b, int N) {
-    std::vector<int> evenIndices, oddIndices;
-
-    for (int i = 0; i < N; i++) {
-        if (i % 2 == 0) {
-            evenIndices.push_back(i);
-        } else {
-            oddIndices.push_back(i);
-        }
-    }
-
-    std::sort(evenIndices.begin(), evenIndices.end(), [&a](int i, int j) { return a[i] < a[j]; });
-    std::sort(oddIndices.begin(), oddIndices.end(), [&a](int i, int j) { return a[i] < a[j]; });
-
-    int *sortedA = new int[N];
-    int *sortedB = new int[N];
-
-    for (int i = 0; i < evenIndices.size(); i++) {
-        sortedA[i] = a[evenIndices[i]];
-        sortedB[i] = b[evenIndices[i]];
-    }
-    for (int i = 0; i < oddIndices.size(); i++) {
-        sortedA[evenIndices.size() + i] = a[oddIndices[i]];
-        sortedB[evenIndices.size() + i] = b[oddIndices[i]];
-    }
-
-    std::copy(sortedA, sortedA + N, a);
-    std::copy(sortedB, sortedB + N, b);
-
-    delete[] sortedA;
-    delete[] sortedB;
 }
 
 __global__
@@ -196,16 +162,12 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 }
 
 
-void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThreads, bool preSortDataByParity) {
-	// demonstrateConditionalBranching() takes kernel function variables and whether to presort the data and 
-	//  performs a branching kernel on the data. In the case that presort is true, this function will sort the 
-	//  data by odd/even to show that the kernel runs faster in that case due to less stalling
-
+void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThreads) {
 	if (verbose) {
 		printf("----- Conditional Branching -----\n");
-		printf("Conditional branching with pre-sort = %d, Array length: %d, Array bytes: %d, "
+		printf("Conditional branching kernel, Array length: %d, Array bytes: %d, "
 			"Blocks: %d, Threads/block: %d, Total threads: %d\n",
-			preSortDataByParity, (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
+			(int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
 			numBlocks, blockSize, totalThreads);
 	}
 
@@ -220,11 +182,6 @@ void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThre
 
 	cudaMemcpy( gpu_a, cpu_a, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
 	cudaMemcpy( gpu_b, cpu_b, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
-
-	// Optionally sort data by odd/even
-	if (preSortDataByParity == true) {
-		sortByParity(cpu_a, cpu_b, ARRAY_SIZE);
-	}
 
 	// Perform and time the operation, synchronizing before stopping the timer
 	auto start = std::chrono::high_resolution_clock::now();
@@ -278,8 +235,7 @@ int main(int argc, char** argv)
 	performMathOperations(numBlocks, blockSize, totalThreads, operation);
 	
 	// printf("Performing real run...\n");
-	// performMathOperations(numBlocks, blockSize, totalThreads, operation);
+	performMathOperations(numBlocks, blockSize, totalThreads, operation);
 
-	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads, true);
-	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads, false);
+	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads);
 }
