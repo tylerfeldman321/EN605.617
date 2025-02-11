@@ -1,6 +1,8 @@
 all: run_no_args assignment
 
-profile_math_operations: assignment
+profile: profile_diff_thread_block_combinations assignment
+
+profile_diff_thread_block_combinations: assignment
 	echo "Running profiling..."
 	./assignment.exe 1048576 256
 	./assignment.exe 524288 256

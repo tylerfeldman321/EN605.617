@@ -194,6 +194,10 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 
 
 void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThreads, bool preSortDataByParity) {
+	// demonstrateConditionalBranching() takes kernel function variables and whether to presort the data and 
+	//  performs a branching kernel on the data. In the case that presort is true, this function will sort the 
+	//  data by odd/even to show that the kernel runs faster in that case due to less stalling
+
 	printf("----- Conditional Branching -----\n");
 
 	printf("Conditional branching with pre-sort = %d, Array length: %d, Array bytes: %d, "
