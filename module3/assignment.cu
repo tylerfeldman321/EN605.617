@@ -90,8 +90,8 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 	//  takes # blocks for kernel, block size (threads/block), total threads, and the math operation to do (add, subtract, multiply, or mod) and performs the operation
 
 	initCpuArrays();
-	printf("Op: %s, Size: %d, Bytes: %d,\n"
-		"Blocks: %d, Threads/block: %d, Total: %d\n",
+	printf("Op: %s, Array length: %d, Array bytes: %d, "
+		"Blocks: %d, Threads/block: %d, Total threads: %d\n",
 		operation.c_str(), (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
 		numBlocks, blockSize, totalThreads);
 
