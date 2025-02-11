@@ -1,4 +1,4 @@
-all: assignment profile
+all: run_no_args assignment
 
 profile: assignment
 	echo "Running profiling..."
@@ -17,6 +17,9 @@ run_math_operations: assignment
 	./assignment.exe 1024 256 multiply
 	./assignment.exe 1024 256 mod
 	echo "Done with math operations."
+
+run_no_args: assignment
+	./assignment.exe
 
 assignment: assignment.cu
 	nvcc assignment.cu -L /usr/local/cuda/lib -lcudart -o assignment.exe
