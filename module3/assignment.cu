@@ -13,6 +13,7 @@ using namespace std;
 int cpu_a[ARRAY_SIZE];
 int cpu_b[ARRAY_SIZE];
 int cpu_result[ARRAY_SIZE];
+bool verbose = true;
 
 inline cudaError_t checkCuda(cudaError_t result)
 {
@@ -137,8 +138,13 @@ void initCpuArrays() {
 void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::string operation) {
 	// performMathOperations()
 	//  takes # blocks for kernel, block size (threads/block), total threads, and the math operation to do (add, subtract, multiply, or mod) and performs the operation
-	printf("----- Math Operations -----\n");
-
+	if (verbose) {
+		printf("----- Math Operations -----\n");
+		printf("Op: %s, Array length: %d, Array bytes: %d, "
+			"Blocks: %d, Threads/block: %d, Total threads: %d\n",
+			operation.c_str(), (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
+			numBlocks, blockSize, totalThreads);
+	}
 	initCpuArrays();
 
 	int *gpu_a;
@@ -150,11 +156,6 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 
 	cudaMemcpy( gpu_a, cpu_a, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
 	cudaMemcpy( gpu_b, cpu_b, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
-
-	printf("Op: %s, Array length: %d, Array bytes: %d, "
-		"Blocks: %d, Threads/block: %d, Total threads: %d\n",
-		operation.c_str(), (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
-		numBlocks, blockSize, totalThreads);
 
 	// Perform and time the operation, synchronizing before stopping the timer
 	auto start = std::chrono::high_resolution_clock::now();
@@ -182,9 +183,11 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 	// Copy data back and synchronize
 	checkCuda( cudaMemcpy( cpu_result, gpu_result, ARRAY_SIZE_IN_BYTES, cudaMemcpyDeviceToHost ) );
 	checkCuda( cudaDeviceSynchronize() );
-	printf("Results of operation: \n");
-	for (int i = 0; i < min(5, ARRAY_SIZE); i++) {
-		printf("Result[%d]: %d, A[%d]: %d, B[%d], %d\n", i, cpu_result[i], i, cpu_a[i], i, cpu_b[i]);
+	if (verbose) {
+		printf("Results of operation: \n");
+		for (int i = 0; i < min(5, ARRAY_SIZE); i++) {
+			printf("Result[%d]: %d, A[%d]: %d, B[%d], %d\n", i, cpu_result[i], i, cpu_a[i], i, cpu_b[i]);
+		}
 	}
 
 	checkCuda( cudaFree(gpu_a) );
@@ -198,12 +201,13 @@ void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThre
 	//  performs a branching kernel on the data. In the case that presort is true, this function will sort the 
 	//  data by odd/even to show that the kernel runs faster in that case due to less stalling
 
-	printf("----- Conditional Branching -----\n");
-
-	printf("Conditional branching with pre-sort = %d, Array length: %d, Array bytes: %d, "
-		"Blocks: %d, Threads/block: %d, Total threads: %d\n",
-		preSortDataByParity, (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
-		numBlocks, blockSize, totalThreads);
+	if (verbose) {
+		printf("----- Conditional Branching -----\n");
+		printf("Conditional branching with pre-sort = %d, Array length: %d, Array bytes: %d, "
+			"Blocks: %d, Threads/block: %d, Total threads: %d\n",
+			preSortDataByParity, (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
+			numBlocks, blockSize, totalThreads);
+	}
 
 	initCpuArrays();
 	int *gpu_a;
@@ -234,11 +238,6 @@ void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThre
 	// Copy data back and synchronize
 	checkCuda( cudaMemcpy( cpu_result, gpu_result, ARRAY_SIZE_IN_BYTES, cudaMemcpyDeviceToHost ) );
 	checkCuda( cudaDeviceSynchronize() );
-	printf("Results of operation: \n");
-	for (int i = 0; i < min(5, ARRAY_SIZE); i++) {
-		printf("Result[%d]: %d, A[%d]: %d, B[%d], %d\n", i, cpu_result[i], i, cpu_a[i], i, cpu_b[i]);
-	}
-
 	checkCuda( cudaFree(gpu_a) );
 	checkCuda( cudaFree(gpu_b) );
 	checkCuda( cudaFree(gpu_result) );
@@ -260,7 +259,8 @@ int main(int argc, char** argv)
 	}
 	if (argc >= 4) {
 		operation = argv[3];
-		std::cout << "Changed operation to " << operation << "\n";
+		if (verbose)
+			std::cout << "Changed operation to " << operation << "\n";
 	}
 
 	int numBlocks = totalThreads/blockSize;
@@ -274,11 +274,11 @@ int main(int argc, char** argv)
 		printf("The total number of threads will be rounded up to %d\n", totalThreads);
 	}
 
-	printf("Performing warm up run...\n");
+	// printf("Performing warm up run...\n");
 	performMathOperations(numBlocks, blockSize, totalThreads, operation);
 	
-	printf("Performing real run...\n");
-	performMathOperations(numBlocks, blockSize, totalThreads, operation);
+	// printf("Performing real run...\n");
+	// performMathOperations(numBlocks, blockSize, totalThreads, operation);
 
 	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads, true);
 	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads, false);
