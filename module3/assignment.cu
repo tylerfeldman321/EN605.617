@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <random>
 #include <iostream>
-#include <chrono>   
+#include <chrono>  
 using namespace std;
 
 #define ARRAY_SIZE 1024
@@ -70,6 +70,21 @@ void mod(int *result, int *a, int *b, int N)
   }
 }
 
+__global__
+void branchingKernel(int *result, int *a, int *b, int N)
+{
+  int index = threadIdx.x + blockIdx.x * blockDim.x;
+  int stride = blockDim.x * gridDim.x;
+  for(int i = index; i < N; i += stride)
+  {
+	if (i % 2 == 0) {
+    	result[i] = a[i] + b[i];
+	} else {
+		result[i] = a[i] * b[i];
+	}
+  }
+}
+
 
 void initCpuArrays() {
 	for (int i = 0; i < ARRAY_SIZE; i++) {
@@ -84,17 +99,71 @@ void initCpuArrays() {
 	}
 }
 
-
 void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::string operation) {
 	// performMathOperations()
 	//  takes # blocks for kernel, block size (threads/block), total threads, and the math operation to do (add, subtract, multiply, or mod) and performs the operation
-
+	printf("----- Math Operations -----\n");
+	
 	initCpuArrays();
+
+	int *gpu_a;
+	int *gpu_b;
+	int *gpu_result;
+	checkCuda( cudaMalloc((void **)&gpu_a, ARRAY_SIZE_IN_BYTES) );
+	checkCuda( cudaMalloc((void **)&gpu_b, ARRAY_SIZE_IN_BYTES) );
+	checkCuda( cudaMalloc((void **)&gpu_result, ARRAY_SIZE_IN_BYTES) );
+
+	cudaMemcpy( gpu_a, cpu_a, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
+	cudaMemcpy( gpu_b, cpu_b, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
+
 	printf("Op: %s, Array length: %d, Array bytes: %d, "
 		"Blocks: %d, Threads/block: %d, Total threads: %d\n",
 		operation.c_str(), (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
 		numBlocks, blockSize, totalThreads);
 
+	auto start = std::chrono::high_resolution_clock::now();
+	if (operation == "add") {
+		add<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
+	} else if (operation == "subtract") {
+		subtract<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
+	} else if (operation == "multiply") {
+		multiply<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
+	} else if (operation == "mod") {
+		mod<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
+	} else {
+		printf("Unexpected operation type: %s. Exiting...\n", operation.c_str());
+		checkCuda( cudaFree(gpu_a) );
+		checkCuda( cudaFree(gpu_b) );
+		checkCuda( cudaFree(gpu_result) );
+		exit(1);
+	}
+	checkCuda( cudaDeviceSynchronize() );
+	auto stop = std::chrono::high_resolution_clock::now();
+
+	checkCuda( cudaGetLastError() );
+	checkCuda( cudaMemcpy( cpu_result, gpu_result, ARRAY_SIZE_IN_BYTES, cudaMemcpyDeviceToHost ) );
+
+	checkCuda( cudaFree(gpu_a) );
+	checkCuda( cudaFree(gpu_b) );
+	checkCuda( cudaFree(gpu_result) );
+
+	std::cout << "Time elapsed GPU = " << std::chrono::duration_cast<chrono::nanoseconds>(stop - start).count() << " ns\n";
+	printf("Results of operation: \n");
+	for (int i = 0; i < min(5, ARRAY_SIZE); i++) {
+		printf("Result[%d]: %d, A[%d]: %d, B[%d], %d\n", i, cpu_result[i], i, cpu_a[i], i, cpu_b[i]);
+	}
+}
+
+
+void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThreads) {
+	printf("----- Conditional Branching -----\n");
+
+	printf("Conditional branching, Array length: %d, Array bytes: %d, "
+		"Blocks: %d, Threads/block: %d, Total threads: %d\n",
+		(int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
+		numBlocks, blockSize, totalThreads);
+
+	initCpuArrays();
 	int *gpu_a;
 	int *gpu_b;
 	int *gpu_result;
@@ -106,34 +175,12 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 	cudaMemcpy( gpu_a, cpu_a, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
 	cudaMemcpy( gpu_b, cpu_b, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
 
-	std::chrono::time_point<std::chrono::high_resolution_clock> start;
-	std::chrono::time_point<std::chrono::high_resolution_clock> stop;
-	if (operation == "add") {
-		start = std::chrono::high_resolution_clock::now();
-		add<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
-		stop = std::chrono::high_resolution_clock::now();
-	} else if (operation == "subtract") {
-		start = std::chrono::high_resolution_clock::now();
-		subtract<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
-		stop = std::chrono::high_resolution_clock::now();
-	} else if (operation == "multiply") {
-		start = std::chrono::high_resolution_clock::now();
-		multiply<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
-		stop = std::chrono::high_resolution_clock::now();
-	} else if (operation == "mod") {
-		start = std::chrono::high_resolution_clock::now();
-		mod<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
-		stop = std::chrono::high_resolution_clock::now();
-	} else {
-		printf("Unexpected operation type: %s. Exiting...\n", operation.c_str());
-		checkCuda( cudaFree(gpu_a) );
-		checkCuda( cudaFree(gpu_b) );
-		checkCuda( cudaFree(gpu_result) );
-		exit(1);
-	}
+	auto start = std::chrono::high_resolution_clock::now();
+	branchingKernel<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
+	checkCuda( cudaDeviceSynchronize() );
+	auto stop = std::chrono::high_resolution_clock::now();
 
 	checkCuda( cudaGetLastError() );
-	checkCuda( cudaDeviceSynchronize() );
 	checkCuda( cudaMemcpy( cpu_result, gpu_result, ARRAY_SIZE_IN_BYTES, cudaMemcpyDeviceToHost ) );
 
 	std::cout << "Time elapsed GPU = " << std::chrono::duration_cast<chrono::nanoseconds>(stop - start).count() << " ns\n";
@@ -148,14 +195,8 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 }
 
 
-void demonstrateConditionalBranching() {
-	return;
-}
-
-
 int main(int argc, char** argv)
 {
-	printf("----- New Run -----\n");
 
 	int totalThreads = (1 << 20);
 	int blockSize = 256;  // Also threads / block
@@ -183,5 +224,11 @@ int main(int argc, char** argv)
 		printf("The total number of threads will be rounded up to %d\n", totalThreads);
 	}
 
+	printf("Performing warm up run...\n");
 	performMathOperations(numBlocks, blockSize, totalThreads, operation);
+	
+	printf("Performing real run...\n");
+	performMathOperations(numBlocks, blockSize, totalThreads, operation);
+
+	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads);
 }
