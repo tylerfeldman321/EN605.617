@@ -3,7 +3,8 @@
 #include <assert.h>
 #include <random>
 #include <iostream>
-#include <chrono>  
+#include <chrono>
+#include <algorithm>
 using namespace std;
 
 #define ARRAY_SIZE 1024
@@ -20,6 +21,40 @@ inline cudaError_t checkCuda(cudaError_t result)
     assert(result == cudaSuccess);
   }
   return result;
+}
+
+
+void sortByParity(int *a, int *b, int N) {
+    std::vector<int> evenIndices, oddIndices;
+
+    for (int i = 0; i < N; i++) {
+        if (i % 2 == 0) {
+            evenIndices.push_back(i);
+        } else {
+            oddIndices.push_back(i);
+        }
+    }
+
+    std::sort(evenIndices.begin(), evenIndices.end(), [&a](int i, int j) { return a[i] < a[j]; });
+    std::sort(oddIndices.begin(), oddIndices.end(), [&a](int i, int j) { return a[i] < a[j]; });
+
+    int *sortedA = new int[N];
+    int *sortedB = new int[N];
+
+    for (int i = 0; i < evenIndices.size(); i++) {
+        sortedA[i] = a[evenIndices[i]];
+        sortedB[i] = b[evenIndices[i]];
+    }
+    for (int i = 0; i < oddIndices.size(); i++) {
+        sortedA[evenIndices.size() + i] = a[oddIndices[i]];
+        sortedB[evenIndices.size() + i] = b[oddIndices[i]];
+    }
+
+    std::copy(sortedA, sortedA + N, a);
+    std::copy(sortedB, sortedB + N, b);
+
+    delete[] sortedA;
+    delete[] sortedB;
 }
 
 __global__
@@ -87,10 +122,10 @@ void branchingKernel(int *result, int *a, int *b, int N)
 
 
 void initCpuArrays() {
+	// Initializes cpu_a data to 0...N and cpu_b data to random numbers from 0-3 inclusive
 	for (int i = 0; i < ARRAY_SIZE; i++) {
 		cpu_a[i] = i;
 	}
-
     random_device rd;
     mt19937 gen(rd());
     uniform_int_distribution<> distrib(0, 3);
@@ -103,7 +138,7 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 	// performMathOperations()
 	//  takes # blocks for kernel, block size (threads/block), total threads, and the math operation to do (add, subtract, multiply, or mod) and performs the operation
 	printf("----- Math Operations -----\n");
-	
+
 	initCpuArrays();
 
 	int *gpu_a;
@@ -121,6 +156,7 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 		operation.c_str(), (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
 		numBlocks, blockSize, totalThreads);
 
+	// Perform and time the operation, synchronizing before stopping the timer
 	auto start = std::chrono::high_resolution_clock::now();
 	if (operation == "add") {
 		add<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
@@ -139,28 +175,30 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 	}
 	checkCuda( cudaDeviceSynchronize() );
 	auto stop = std::chrono::high_resolution_clock::now();
+	std::cout << "Time elapsed GPU = " << std::chrono::duration_cast<chrono::nanoseconds>(stop - start).count() << " ns\n";
 
 	checkCuda( cudaGetLastError() );
+
+	// Copy data back and synchronize
 	checkCuda( cudaMemcpy( cpu_result, gpu_result, ARRAY_SIZE_IN_BYTES, cudaMemcpyDeviceToHost ) );
-
-	checkCuda( cudaFree(gpu_a) );
-	checkCuda( cudaFree(gpu_b) );
-	checkCuda( cudaFree(gpu_result) );
-
-	std::cout << "Time elapsed GPU = " << std::chrono::duration_cast<chrono::nanoseconds>(stop - start).count() << " ns\n";
+	checkCuda( cudaDeviceSynchronize() );
 	printf("Results of operation: \n");
 	for (int i = 0; i < min(5, ARRAY_SIZE); i++) {
 		printf("Result[%d]: %d, A[%d]: %d, B[%d], %d\n", i, cpu_result[i], i, cpu_a[i], i, cpu_b[i]);
 	}
+
+	checkCuda( cudaFree(gpu_a) );
+	checkCuda( cudaFree(gpu_b) );
+	checkCuda( cudaFree(gpu_result) );
 }
 
 
-void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThreads) {
+void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThreads, bool preSortDataByParity) {
 	printf("----- Conditional Branching -----\n");
 
-	printf("Conditional branching, Array length: %d, Array bytes: %d, "
+	printf("Conditional branching with pre-sort = %d, Array length: %d, Array bytes: %d, "
 		"Blocks: %d, Threads/block: %d, Total threads: %d\n",
-		(int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
+		preSortDataByParity, (int)ARRAY_SIZE, (int)ARRAY_SIZE_IN_BYTES, 
 		numBlocks, blockSize, totalThreads);
 
 	initCpuArrays();
@@ -175,15 +213,23 @@ void demonstrateConditionalBranching(int numBlocks, int blockSize, int totalThre
 	cudaMemcpy( gpu_a, cpu_a, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
 	cudaMemcpy( gpu_b, cpu_b, ARRAY_SIZE_IN_BYTES, cudaMemcpyHostToDevice );
 
+	// Optionally sort data by odd/even
+	if (preSortDataByParity == true) {
+		sortByParity(cpu_a, cpu_b, ARRAY_SIZE);
+	}
+
+	// Perform and time the operation, synchronizing before stopping the timer
 	auto start = std::chrono::high_resolution_clock::now();
 	branchingKernel<<<numBlocks, blockSize>>>(gpu_result, gpu_a, gpu_b, ARRAY_SIZE);
 	checkCuda( cudaDeviceSynchronize() );
 	auto stop = std::chrono::high_resolution_clock::now();
+	std::cout << "Time elapsed GPU = " << std::chrono::duration_cast<chrono::nanoseconds>(stop - start).count() << " ns\n";
 
 	checkCuda( cudaGetLastError() );
-	checkCuda( cudaMemcpy( cpu_result, gpu_result, ARRAY_SIZE_IN_BYTES, cudaMemcpyDeviceToHost ) );
 
-	std::cout << "Time elapsed GPU = " << std::chrono::duration_cast<chrono::nanoseconds>(stop - start).count() << " ns\n";
+	// Copy data back and synchronize
+	checkCuda( cudaMemcpy( cpu_result, gpu_result, ARRAY_SIZE_IN_BYTES, cudaMemcpyDeviceToHost ) );
+	checkCuda( cudaDeviceSynchronize() );
 	printf("Results of operation: \n");
 	for (int i = 0; i < min(5, ARRAY_SIZE); i++) {
 		printf("Result[%d]: %d, A[%d]: %d, B[%d], %d\n", i, cpu_result[i], i, cpu_a[i], i, cpu_b[i]);
@@ -230,5 +276,6 @@ int main(int argc, char** argv)
 	printf("Performing real run...\n");
 	performMathOperations(numBlocks, blockSize, totalThreads, operation);
 
-	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads);
+	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads, true);
+	demonstrateConditionalBranching(numBlocks, blockSize, totalThreads, false);
 }
