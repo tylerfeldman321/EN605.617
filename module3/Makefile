@@ -1,6 +1,6 @@
 all: run_no_args assignment
 
-profile: assignment
+profile_math_operations: assignment
 	echo "Running profiling..."
 	./assignment.exe 1048576 256
 	./assignment.exe 524288 256

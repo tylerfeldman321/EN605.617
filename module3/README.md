@@ -71,16 +71,12 @@ Result[4]: -1, A[4]: 4, B[4], 0
 ```
 
 ## Effects of Conditional Branching in CUDA
+- Create a program that demonstrates the effect of conditional branching in CUDA 
+kernels executing similar algorithms. Some charts and result description is 
+required as well.
 - Use two additional numbers of threads
 - Use two additional block sizes
-
-## 
-
-## Create a separate program (or include in the same code base from the previous step) that demonstrates the effect of conditional branching inside vs outside of CUDA kernels implementing similar algorithms. You will also need to include at least one performance comparison chart and a short text file that includes your thoughts on the results.
-
-## The base CUDA source code file must be called assignment.cu and be housed in the module3 directory of your repository. It will need to be runnable as assignment.exe 512 256.  You can modify the Makefile as you see fit, as long as the make command (with no arguments), builds the assignment.exe as the executable output.  The assignment.cu file that I have provided in the module3 directory  handles the two arguments for total number of threads and number of threads per block.
-
-## You will need to include the zipped up code for the assignment and images/video/links that show your code completing all of the parts of the rubric that it is designed to complete in what is submitted for this assignment.
+- Include at least one performance comparison chart and a short text file that includes your thoughts on the results.
 
 ## Stretch Problem
 **The good:**

@@ -148,6 +148,11 @@ void performMathOperations(int numBlocks, int blockSize, int totalThreads, std::
 }
 
 
+void demonstrateConditionalBranching() {
+	return;
+}
+
+
 int main(int argc, char** argv)
 {
 	printf("----- New Run -----\n");
