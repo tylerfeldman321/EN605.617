@@ -10,5 +10,13 @@ profile: assignment
 	./assignment.exe 1048576 32
 	echo "Done profiling."
 
+run_math_operations: assignment
+	echo "Running math operation..."
+	./assignment.exe 1024 256 add
+	./assignment.exe 1024 256 subtract
+	./assignment.exe 1024 256 multiply
+	./assignment.exe 1024 256 mod
+	echo "Done with math operations."
+
 assignment: assignment.cu
 	nvcc assignment.cu -L /usr/local/cuda/lib -lcudart -o assignment.exe
