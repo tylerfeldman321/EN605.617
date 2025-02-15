@@ -12,6 +12,7 @@
 #include <assert.h>
 
 static const int WORK_SIZE = 256;
+static const bool VERBOSE = false;
 
 #define NUM_ELEMENTS 4096
 
@@ -71,9 +72,11 @@ __host__ float add_test_interleaved_cpu(INTERLEAVED_T * const host_dest_ptr,
 		const unsigned int num_elements) {
 	cudaEvent_t start_time = get_time();
 	for (unsigned int tid = 0; tid < num_elements; tid++) {
-		printf("tid: %u ", tid);
+		if (VERBOSE)
+			printf("tid: %u ", tid);
 		for (unsigned int i = 0; i < iter; i++) {
-			printf("iteration: %u\n", iter);
+			if (VERBOSE)
+				printf("iteration: %u\n", iter);
 			host_dest_ptr[tid].a += host_src_ptr[tid].a;
 			host_dest_ptr[tid].b += host_src_ptr[tid].b;
 			host_dest_ptr[tid].c += host_src_ptr[tid].c;
@@ -393,9 +396,13 @@ void execute_host_functions()
 {
 	INTERLEAVED_T host_dest_ptr[NUM_ELEMENTS];
 	INTERLEAVED_T host_src_ptr[NUM_ELEMENTS];
-	float duration = add_test_interleaved_cpu(host_dest_ptr, host_src_ptr, 4,NUM_ELEMENTS);
-	printf("duration: %fms\n", duration);
+	float duration_interleaved = add_test_interleaved_cpu(host_dest_ptr, host_src_ptr, 4,NUM_ELEMENTS);
+	printf("[TIMING] cpu add interleaved duration with N=%d: %fms\n", NUM_ELEMENTS, duration_interleaved);
 
+	NON_INTERLEAVED_T host_dest_non_interleaved;
+	NON_INTERLEAVED_T host_src_non_iterleaved;
+	float duration_non_interleaved = add_test_non_interleaved_cpu(host_dest_non_interleaved, host_src_non_iterleaved, 4,NUM_ELEMENTS);
+	printf("[TIMING] cpu add non-interleaved duration with N=%d: %fms\n", NUM_ELEMENTS, duration_non_interleaved);
 }
 
 void execute_gpu_functions()
@@ -407,21 +414,23 @@ void execute_gpu_functions()
 		idata[i] = (unsigned int) i;
 
 	cudaMalloc((void** ) &d, sizeof(int) * WORK_SIZE);
-	
-			cudaMemcpy(d, idata, sizeof(int) * WORK_SIZE,
-					cudaMemcpyHostToDevice);
+
+	cudaMemcpy(d, idata, sizeof(int) * WORK_SIZE,
+			cudaMemcpyHostToDevice);
 
 	bitreverse<<<1, WORK_SIZE, WORK_SIZE * sizeof(int)>>>(d);
 
 	cudaThreadSynchronize();	// Wait for the GPU launched work to complete
 	cudaGetLastError();
-	
-			cudaMemcpy(odata, d, sizeof(int) * WORK_SIZE,
-					cudaMemcpyDeviceToHost);
 
-	for (i = 0; i < WORK_SIZE; i++)
-		printf("Input value: %u, device output: %u, host output: %u\n",
-				idata[i], odata[i], bitreverse(idata[i]));
+	cudaMemcpy(odata, d, sizeof(int) * WORK_SIZE,
+			cudaMemcpyDeviceToHost);
+
+	if (VERBOSE) {
+		for (i = 0; i < WORK_SIZE; i++)
+			printf("Input value: %u, device output: %u, host output: %u\n",
+					idata[i], odata[i], bitreverse(idata[i]));
+	}
 
 	cudaFree((void* ) d);
 	cudaDeviceReset();
