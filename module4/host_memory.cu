@@ -12,9 +12,19 @@ void saxpy(int n, float a, float *x, float *y)
   if (i < n) y[i] = a*x[i] + y[i];
 }
 
-int main(void)
+int main(int argc, char** argv)
 {
-  int N = 1<<20;
+  int n_exponent = 20;
+  if (argc == 2) {
+    n_exponent = atoi(argv[1]);
+    cout << "[INFO] Setting n exponent to " << n_exponent << "\n";
+  } else if (argc > 2) {
+    cout << "[WARNING] Received more than 1 cli arguments, only 1 is supported.\n";
+  }
+
+  int N = 1<<n_exponent;
+  cout << "[INFO] N=" << N << "\n";
+
   float *x, *y, *d_x, *d_y;
   x = (float*)malloc(N*sizeof(float));
   y = (float*)malloc(N*sizeof(float));
@@ -37,14 +47,14 @@ int main(void)
   cudaMemcpy(y, d_y, N*sizeof(float), cudaMemcpyDeviceToHost);
   cudaDeviceSynchronize();
 	auto stop = std::chrono::high_resolution_clock::now();
-	std::cout << "Time elapsed GPU = " << std::chrono::duration_cast<chrono::nanoseconds>(stop - start).count() << " ns\n";
+	std::cout << "[INFO] Time elapsed GPU = " << std::chrono::duration_cast<chrono::microseconds>(stop - start).count() << " microseconds\n";
 
   float maxError = 0.0f;
   for (int i = 0; i < N; i++){
     maxError = max(maxError, abs(y[i]-4.0f));
     // printf("y[%d]=%f\n",i,y[i]);
   }
-  printf("Max error: %f\n", maxError);
+  printf("[INFO] Max error: %f\n", maxError);
 
   cudaFree(d_x);
   cudaFree(d_y);
