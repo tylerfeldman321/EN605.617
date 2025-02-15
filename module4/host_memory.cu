@@ -1,4 +1,7 @@
 #include <stdio.h>
+#include <iostream>
+#include <chrono>
+using namespace std;
 
 //From https://devblogs.nvidia.com/parallelforall/easy-introduction-cuda-c-and-c/
 
@@ -24,6 +27,7 @@ int main(void)
     y[i] = 2.0f;
   }
 
+  auto start = std::chrono::high_resolution_clock::now();
   cudaMemcpy(d_x, x, N*sizeof(float), cudaMemcpyHostToDevice);
   cudaMemcpy(d_y, y, N*sizeof(float), cudaMemcpyHostToDevice);
 
@@ -31,11 +35,14 @@ int main(void)
   saxpy<<<(N+255)/256, 256>>>(N, 2.0f, d_x, d_y);
 
   cudaMemcpy(y, d_y, N*sizeof(float), cudaMemcpyDeviceToHost);
+  cudaDeviceSynchronize();
+	auto stop = std::chrono::high_resolution_clock::now();
+	std::cout << "Time elapsed GPU = " << std::chrono::duration_cast<chrono::nanoseconds>(stop - start).count() << " ns\n";
 
   float maxError = 0.0f;
   for (int i = 0; i < N; i++){
     maxError = max(maxError, abs(y[i]-4.0f));
-    printf("y[%d]=%f\n",i,y[i]);
+    // printf("y[%d]=%f\n",i,y[i]);
   }
   printf("Max error: %f\n", maxError);
 
