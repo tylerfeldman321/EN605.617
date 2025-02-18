@@ -98,8 +98,8 @@ __global__ void add_kernel_interleaved(INTERLEAVED_T * const dest_ptr,
 		const unsigned int num_elements) {
 
 	const unsigned int tid = (blockIdx.x * blockDim.x) + threadIdx.x;
-
-	if(tid < num_elements)
+	const unsigned int stride = blockDim.x * gridDim.x;
+	for (int dataIdx = tid; dataIdx < num_elements; dataIdx += stride)
 	{
 		for(unsigned int i=0; i<iter; i++)
 		{
@@ -116,13 +116,14 @@ __global__ void add_kernel_non_interleaved(
 		NON_INTERLEAVED_T * const src_ptr, const unsigned int iter,
 		const unsigned int num_elements) {
 	const unsigned int tid = (blockIdx.x * blockDim.x) + threadIdx.x;
-	if(tid < num_elements)
+	const unsigned int stride = blockDim.x * gridDim.x;
+	for (int dataIdx = tid; dataIdx < num_elements; dataIdx += stride)
 	{
 		for (unsigned int i = 0; i < iter; i++) {
-			dest_ptr->a[tid] += src_ptr->a[tid];
-			dest_ptr->b[tid] += src_ptr->b[tid];
-			dest_ptr->c[tid] += src_ptr->c[tid];
-			dest_ptr->d[tid] += src_ptr->d[tid];
+			dest_ptr->a[dataIdx] += src_ptr->a[dataIdx];
+			dest_ptr->b[dataIdx] += src_ptr->b[dataIdx];
+			dest_ptr->c[dataIdx] += src_ptr->c[dataIdx];
+			dest_ptr->d[dataIdx] += src_ptr->d[dataIdx];
 		}
 	}
 }
