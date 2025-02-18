@@ -14,7 +14,7 @@
 static const int WORK_SIZE = 256;
 static const bool VERBOSE = false;
 
-#define NUM_ELEMENTS 4096
+#define NUM_ELEMENTS 65536
 
 typedef struct {
 	unsigned int a;
@@ -115,8 +115,9 @@ __global__ void add_kernel_non_interleaved(
 		NON_INTERLEAVED_T * const dest_ptr,
 		NON_INTERLEAVED_T * const src_ptr, const unsigned int iter,
 		const unsigned int num_elements) {
-
-	for (unsigned int tid = 0; tid < num_elements; tid++) {
+	const unsigned int tid = (blockIdx.x * blockDim.x) + threadIdx.x;
+	if(tid < num_elements)
+	{
 		for (unsigned int i = 0; i < iter; i++) {
 			dest_ptr->a[tid] += src_ptr->a[tid];
 			dest_ptr->b[tid] += src_ptr->b[tid];
@@ -168,6 +169,51 @@ __host__ float add_test_interleaved(INTERLEAVED_T * const host_dest_ptr,
 
 	return delta;
 }
+
+
+__host__ float add_test_non_interleaved(NON_INTERLEAVED_T * const host_dest_ptr,
+	NON_INTERLEAVED_T * const host_src_ptr, const unsigned int iter,
+	const unsigned int num_elements)
+{
+	const unsigned int num_threads = 256;
+	const unsigned int num_blocks = (num_elements + (num_threads-1)) / num_threads;
+
+	const size_t num_bytes = sizeof(NON_INTERLEAVED_T);
+	NON_INTERLEAVED_T * device_dest_ptr;
+	NON_INTERLEAVED_T * device_src_ptr;
+
+	cudaMalloc((void **) &device_src_ptr, num_bytes);
+	cudaMalloc((void **) &device_dest_ptr, num_bytes);
+
+	cudaEvent_t kernel_start, kernel_stop;
+	cudaEventCreate(&kernel_start,0);
+	cudaEventCreate(&kernel_stop,0);
+
+	cudaStream_t test_stream;
+	cudaStreamCreate(&test_stream);
+
+	cudaMemcpy(device_src_ptr, host_src_ptr, num_bytes, cudaMemcpyHostToDevice);
+
+	cudaEventRecord(kernel_start, 0);
+
+	add_kernel_non_interleaved<<<num_blocks,num_threads>>>(device_dest_ptr, device_src_ptr, iter, num_elements);
+
+	cudaEventRecord(kernel_stop, 0);
+
+	cudaEventSynchronize(kernel_stop);
+
+	float delta = 0.0F;
+	cudaEventElapsedTime(&delta, kernel_start, kernel_stop);
+
+	cudaFree(device_src_ptr);
+	cudaFree(device_dest_ptr);
+	cudaEventDestroy(kernel_start);
+	cudaEventDestroy(kernel_stop);
+	cudaStreamDestroy(test_stream);
+
+	return delta;
+}
+
 
 __host__ float select_samples_cpu(unsigned int * const sample_data,
 									const unsigned int sample_interval,
@@ -399,8 +445,8 @@ void execute_host_functions()
 	float duration_interleaved = add_test_interleaved_cpu(host_dest_ptr, host_src_ptr, 4,NUM_ELEMENTS);
 	printf("[TIMING] CPU add interleaved duration with N=%d: %fms\n", NUM_ELEMENTS, duration_interleaved);
 
-	NON_INTERLEAVED_T host_dest_non_interleaved;
-	NON_INTERLEAVED_T host_src_non_iterleaved;
+	NON_INTERLEAVED_T host_dest_non_interleaved = NON_INTERLEAVED_T();
+	NON_INTERLEAVED_T host_src_non_iterleaved = NON_INTERLEAVED_T();
 	float duration_non_interleaved = add_test_non_interleaved_cpu(host_dest_non_interleaved, host_src_non_iterleaved, 4,NUM_ELEMENTS);
 	printf("[TIMING] CPU add non-interleaved duration with N=%d: %fms\n", NUM_ELEMENTS, duration_non_interleaved);
 }
@@ -411,6 +457,11 @@ void execute_gpu_functions()
 	INTERLEAVED_T host_src_ptr[NUM_ELEMENTS];
 	float duration_interleaved = add_test_interleaved(host_dest_ptr, host_src_ptr, 4, NUM_ELEMENTS);
 	printf("[TIMING] GPU add interleaved duration with N=%d: %fms\n", NUM_ELEMENTS, duration_interleaved);
+
+	NON_INTERLEAVED_T host_dest_non_interleaved;
+	NON_INTERLEAVED_T host_src_non_iterleaved;
+	float duration_non_interleaved = add_test_non_interleaved(&host_dest_non_interleaved, &host_src_non_iterleaved, 4, NUM_ELEMENTS);
+	printf("[TIMING] GPU add non-interleaved duration with N=%d: %fms\n", NUM_ELEMENTS, duration_non_interleaved);
 }
 
 /**
