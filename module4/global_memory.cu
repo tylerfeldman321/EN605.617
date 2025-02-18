@@ -11,7 +11,7 @@
 #include <stdlib.h>
 #include <assert.h>
 
-static const int WORK_SIZE = 256;
+// static const int WORK_SIZE = 256;
 static const bool VERBOSE = false;
 
 #define NUM_ELEMENTS 65536

@@ -3,9 +3,11 @@ all: host_memory global_memory
 profile: profile_host_memory profile_global_memory
 
 profile_host_memory: host_memory
+	echo "Profiling host memory executable..."
 	./profile.sh
 
 profile_global_memory: global_memory
+	echo "Profiling global memory executable..."
 	sed -i 's/^#define NUM_ELEMENTS .*/#define NUM_ELEMENTS 256/' global_memory.cu
 	nvcc -o global_memory global_memory.cu -run
 	sed -i 's/^#define NUM_ELEMENTS .*/#define NUM_ELEMENTS 512/' global_memory.cu
@@ -23,10 +25,6 @@ profile_global_memory: global_memory
 	sed -i 's/^#define NUM_ELEMENTS .*/#define NUM_ELEMENTS 32768/' global_memory.cu
 	nvcc -o global_memory global_memory.cu -run
 	sed -i 's/^#define NUM_ELEMENTS .*/#define NUM_ELEMENTS 65536/' global_memory.cu
-	nvcc -o global_memory global_memory.cu -run	
-	sed -i 's/^#define NUM_ELEMENTS .*/#define NUM_ELEMENTS 131072/' global_memory.cu
-	nvcc -o global_memory global_memory.cu -run	
-	sed -i 's/^#define NUM_ELEMENTS .*/#define NUM_ELEMENTS 262144/' global_memory.cu
 	nvcc -o global_memory global_memory.cu -run	
 
 host_memory: host_memory.cu
