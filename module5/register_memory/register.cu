@@ -1,8 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #define KERNEL_LOOP 2048
-#define KERNEL_SIZE 128
+#define KERNEL_SIZE 256
 
 __host__ void wait_exit(void)
 {
@@ -26,6 +27,11 @@ __global__ void test_gpu_register(unsigned int * const data, const unsigned int 
         if(tid < num_elements)
         {
                 unsigned int d_tmp = data[tid];
+
+                unsigned int d_tmp1[(1 << 30)];
+                for  (int i = 0; i < (1 << 30); i++) {
+                        d_tmp1[i] = data[tid] * i;
+                }
                 d_tmp = d_tmp * 2;
                 data[tid] = d_tmp;
         }
@@ -43,13 +49,19 @@ __host__ void gpu_kernel(void)
         unsigned int host_packed_array[num_elements];
         unsigned int host_packed_array_output[num_elements];
 
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+
         cudaMalloc(&data_gpu, num_bytes);
 
         generate_rand_data(host_packed_array);
 
         cudaMemcpy(data_gpu, host_packed_array, num_bytes,cudaMemcpyHostToDevice);
 
+        cudaEventRecord(start);
         test_gpu_register <<<num_blocks, num_threads>>>(data_gpu, num_elements);
+	cudaEventRecord(stop);
 
         cudaThreadSynchronize();        // Wait for the GPU launched work to complete
         cudaGetLastError();
@@ -59,6 +71,11 @@ __host__ void gpu_kernel(void)
         for (int i = 0; i < num_elements; i++){
                 printf("Input value: %x, device output: %x\n",host_packed_array[i], host_packed_array_output[i]);
         }
+
+        cudaEventSynchronize(stop);
+	float milliseconds = 0;
+	cudaEventElapsedTime(&milliseconds, start, stop);
+	printf("Milliseconds elapsed: %f\n", milliseconds);
 
         cudaFree((void* ) data_gpu);
         cudaDeviceReset();

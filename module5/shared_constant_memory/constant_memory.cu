@@ -80,15 +80,15 @@ __host__ void gpu_kernel(void) {
 			cudaMalloc(&data_gpu, num_bytes);
 			cudaEventCreate(&kernel_start1);
 			cudaEventCreate(&kernel_start2);
-			
-					cudaEventCreateWithFlags(&kernel_stop1,
-							cudaEventBlockingSync);
-			
-					cudaEventCreateWithFlags(&kernel_stop2,
-							cudaEventBlockingSync);
+	
+			cudaEventCreateWithFlags(&kernel_stop1,
+					cudaEventBlockingSync);
+	
+			cudaEventCreateWithFlags(&kernel_stop2,
+					cudaEventBlockingSync);
 
 			cudaGetDeviceProperties(&device_prop, device_num);
-			sprintf(device_prefix, "ID: %d %s:", device_num, device_prop.name);
+			snprintf(device_prefix, sizeof(device_prefix), "ID: %d %.250s:", device_num, device_prop.name);
 
 			const_test_gpu_literal<<<num_blocks, num_threads>>>(data_gpu,
 					num_elements);
@@ -105,9 +105,9 @@ __host__ void gpu_kernel(void) {
 
 			cudaEventRecord(kernel_stop1, 0);
 			cudaEventSynchronize(kernel_stop1);
-			
-					cudaEventElapsedTime(&delta_time1, kernel_start1,
-							kernel_stop1);
+	
+			cudaEventElapsedTime(&delta_time1, kernel_start1,
+					kernel_stop1);
 
 			const_test_gpu_const<<<num_blocks, num_threads>>>(data_gpu,
 					num_elements);
@@ -117,9 +117,9 @@ __host__ void gpu_kernel(void) {
 
 			cudaEventRecord(kernel_stop2, 0);
 			cudaEventSynchronize(kernel_stop2);
-			
-					cudaEventElapsedTime(&delta_time2, kernel_start2,
-							kernel_stop2);
+	
+			cudaEventElapsedTime(&delta_time2, kernel_start2,
+					kernel_stop2);
 
 			if (delta_time1 > delta_time2) {
 				printf(
@@ -185,20 +185,32 @@ void execute_gpu_functions()
 		idata[i] = (unsigned int) i;
 	}
 
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+
 	cudaMalloc((void** ) &data, sizeof(int) * WORK_SIZE);
 	
 	cudaMemcpy(data, idata, sizeof(unsigned int) * WORK_SIZE, cudaMemcpyHostToDevice);
 
+	cudaEventRecord(start);
 	const_test_gpu_literal<<<num_blocks,num_threads>>>(data, WORK_SIZE);
-	cudaThreadSynchronize();	// Wait for the GPU launched work to complete
+	cudaEventRecord(stop);
+
+	cudaDeviceSynchronize();	// Wait for the GPU launched work to complete
 	cudaGetLastError();
-	
+
 	cudaMemcpy(odata, data, sizeof(int) * WORK_SIZE, cudaMemcpyDeviceToHost);
 
 	for (i = 0; i < WORK_SIZE; i++) {
 		printf("Input value: %u, device output: %u\n", idata[i], odata[i]);
 	}
 	
+	cudaEventSynchronize(stop);
+	float milliseconds = 0;
+	cudaEventElapsedTime(&milliseconds, start, stop);
+	printf("Milliseconds elapsed: %f\n", milliseconds);
+
 	cudaFree((void* ) data);
 	cudaDeviceReset();
 }

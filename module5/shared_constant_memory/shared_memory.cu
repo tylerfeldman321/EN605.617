@@ -508,12 +508,18 @@ void execute_gpu_functions()
 		idata[i] = (unsigned int) i;
 	}
 
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+
 	cudaMalloc((void** ) &d, sizeof(int) * NUM_ELEMENTS);
 	
 	cudaMemcpy(d, idata, sizeof(unsigned int) * NUM_ELEMENTS, cudaMemcpyHostToDevice);
 
 	//Call GPU kernels
+	cudaEventRecord(start);
 	gpu_sort_array_array<<<1, NUM_ELEMENTS>>>(d,MAX_NUM_LISTS,NUM_ELEMENTS);
+	cudaEventRecord(stop);
 
 	cudaThreadSynchronize();	// Wait for the GPU launched work to complete
 	cudaGetLastError();
@@ -523,7 +529,12 @@ void execute_gpu_functions()
 	for (i = 0; i < NUM_ELEMENTS; i++) {
 		printf("Input value: %u, device output: %u\n", idata[i], odata[i]);
 	}
-	
+
+	cudaEventSynchronize(stop);
+	float milliseconds = 0;
+	cudaEventElapsedTime(&milliseconds, start, stop);
+	printf("Milliseconds elapsed: %f\n", milliseconds);
+
 	cudaFree((void* ) d);
 	cudaDeviceReset();
 
@@ -533,7 +544,7 @@ void execute_gpu_functions()
  * Host function that prepares data array and passes it to the CUDA kernel.
  */
 int main(void) {
-	execute_host_functions();
+	// execute_host_functions();
 	execute_gpu_functions();
 
 	return 0;

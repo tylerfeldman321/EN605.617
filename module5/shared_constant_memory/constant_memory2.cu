@@ -117,7 +117,7 @@ __host__ void gpu_kernel(void)
 		cudaEventCreateWithFlags(&kernel_stop2, cudaEventBlockingSync);
 
 		cudaGetDeviceProperties(&device_prop, device_num);
-		sprintf(device_prefix, "ID: %d %s:", device_num, device_prop.name);
+		snprintf(device_prefix, sizeof(device_prefix), "ID: %d %.250s:", device_num, device_prop.name);
 
 		for(int num_test=0; num_test < max_runs; num_test++)
 		{
@@ -211,7 +211,7 @@ void execute_gpu_functions()
 
 	const_test_gpu_const<<<1, WORK_SIZE>>>(d,WORK_SIZE);
 
-	cudaThreadSynchronize();	// Wait for the GPU launched work to complete
+	cudaDeviceSynchronize();	// Wait for the GPU launched work to complete
 	cudaGetLastError();
 	cudaMemcpy(odata, d, sizeof(int) * WORK_SIZE, cudaMemcpyDeviceToHost);
 
