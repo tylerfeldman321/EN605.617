@@ -5,7 +5,7 @@ For this assignment, I've created a program that performs a math operation on tw
 ## Building and Running
 ```bash
 # Build and run the program
-make run
+make
 
 # Build and profile
 make profile

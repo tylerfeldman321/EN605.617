@@ -1,4 +1,4 @@
-all: assignment run
+all: assignment.exe run
 
 profile: profile_diff_thread_block_combinations
 
