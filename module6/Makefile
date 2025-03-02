@@ -14,8 +14,8 @@ profile_diff_thread_block_combinations: assignment.exe
 run: assignment.exe
 	./assignment.exe 1048576 256 1
 
-assignment: assignment.cu
-	nvcc assignment.cu -L /usr/local/cuda/lib -lcudart -o assignment.exe -run
+assignment.exe: assignment.cu
+	nvcc assignment.cu -L /usr/local/cuda/lib -lcudart -o assignment.exe
 
 clean:
 	rm assignment.exe
