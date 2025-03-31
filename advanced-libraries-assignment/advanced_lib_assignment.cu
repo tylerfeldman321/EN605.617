@@ -52,6 +52,12 @@ int main(int argc, char** argv) {
     }
     printf("Using %d points to sample\n", pointsToSample);
 
+    // Timing setup
+	cudaEvent_t start, stop;
+	cudaEventCreate(&start);
+	cudaEventCreate(&stop);
+	cudaEventRecord(start);
+
     // cuRAND initialization
     curandGenerator_t gen;
     CURAND_CALL(curandCreateGenerator(&gen,
@@ -78,7 +84,14 @@ int main(int argc, char** argv) {
     auto end = thrust::make_zip_iterator(thrust::make_tuple(d_x.end(), d_y.end()));
     int insideCircleCount = thrust::count_if(begin, end, withinQuarterCircle());
     float estimateOfPi = 4.0f * static_cast<float>(insideCircleCount) / static_cast<float>(pointsToSample);
+
+	cudaEventRecord(stop);
+
     printf("Estimate of Pi: %f\n", estimateOfPi);
+	cudaEventSynchronize(stop);
+	float milliseconds = 0;
+	cudaEventElapsedTime(&milliseconds, start, stop);
+	printf("Milliseconds elapsed: %f\n", milliseconds);
 
     // Cleanup of cuRAND and device memory. Thrust vectors should clean themselves up
     CURAND_CALL(curandDestroyGenerator(gen));
