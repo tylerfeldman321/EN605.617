@@ -1,4 +1,4 @@
-# Advanced Libraries Assignment
+# Advanced Libraries Assignment: Computing PI with cuRAND and Thrust
 Author: Tyler Feldman / tfeldma7
 
 ## Description
