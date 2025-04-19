@@ -90,6 +90,13 @@ int main(int argc, char** argv)
     std::cout << "Loaded " << samples.size() << " samples.\n";
     std::cout << "Loaded samples from " << sfinfo.channels << " channels\n";
 
+    // Copy into vector short 2format
+    std::vector<cl_short2> stereo_frames(sfinfo.frames);
+    for (size_t i = 0; i < sfinfo.frames; ++i) {
+        stereo_frames[i].s[0] = samples[i * 2];     // Left
+        stereo_frames[i].s[1] = samples[i * 2 + 1]; // Right
+    }
+
     // First, select an OpenCL platform to run on.  
     errNum = clGetPlatformIDs(0, NULL, &numPlatforms);
     checkErr( (errNum != CL_SUCCESS) ? errNum : (numPlatforms <= 0 ? -1 : CL_SUCCESS), "clGetPlatformIDs"); 
@@ -193,7 +200,7 @@ int main(int argc, char** argv)
     cl_mem main_buffer = clCreateBuffer(
         context,
         CL_MEM_READ_WRITE,
-        sizeof(short) * samples.size(),
+        sizeof(cl_short2) * stereo_frames.size(),
         NULL,
         &errNum);
     checkErr(errNum, "clCreateBuffer");
@@ -234,8 +241,8 @@ int main(int argc, char** argv)
 		main_buffer,
 		CL_TRUE,
 		0,
-		sizeof(short) * samples.size(),
-		(void*)&samples[0],
+		sizeof(cl_short2) * stereo_frames.size(),
+		(void*)&stereo_frames[0],
 		0,
 		NULL,
 		NULL);
@@ -244,7 +251,7 @@ int main(int argc, char** argv)
     
     // Call the kernel
 	cl_event event;
-	size_t gWI = samples.size();
+	size_t gWI = stereo_frames.size();
 	errNum = clEnqueueNDRangeKernel(
 		queue, 
 		kernel,
@@ -268,12 +275,17 @@ int main(int argc, char** argv)
 		main_buffer,
 		CL_TRUE,
 		0,
-		sizeof(short) * samples.size(),
-		(void*)&samples[0],
+		sizeof(cl_short2) * stereo_frames.size(),
+		(void*)&stereo_frames[0],
 		0,
 		NULL,
 		NULL);
 
+    // Copy data back into interleaved short format from short2 format
+    for (size_t i = 0; i < num_frames; ++i) {
+        samples[i * 2]     = stereo_frames[i].s[0];
+        samples[i * 2 + 1] = stereo_frames[i].s[1];
+    }
     const char* output_filepath = "output.wav";
     if (write_wav_file(output_filepath, samples, sfinfo.samplerate, 2)) {
         std::cout << "Stereo WAV file written successfully to: " << output_filepath << std::endl;
