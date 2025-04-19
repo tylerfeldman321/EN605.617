@@ -51,6 +51,8 @@ bool write_wav_file(const std::string& filename, const std::vector<short>& data,
 //
 int main(int argc, char** argv)
 {
+    std::cout << "Audio panning assignment by Tyler Feldman" << std::endl;
+
     cl_int errNum;
     cl_uint numPlatforms;
     cl_uint numDevices;
@@ -63,10 +65,16 @@ int main(int argc, char** argv)
 
     // Get wav file as an argument
 	if (argc < 2)
-	{	puts ("Apply panning to an input stereo wav file. ") ;
-		puts ("    Usage : generate <wav_file>\n") ;
+	{	puts ("Apply panning to an input stereo wav file. Panning level can be from 0.0 (all left) to 1.0 (all right)") ;
+		puts ("    Usage : generate <wav_file> <panning-level>\n") ;
 		exit (1) ;
     };
+
+    float pan = 1.0f;
+	if (argc >= 3) {
+		pan = atof(argv[2]);
+	}
+    std::cout << "Using a panning value of " << pan << ".\n";
 
     // Load audio data
     SF_INFO sfinfo;
@@ -81,13 +89,6 @@ int main(int argc, char** argv)
     sf_close(sndfile);
     std::cout << "Loaded " << samples.size() << " samples.\n";
     std::cout << "Loaded samples from " << sfinfo.channels << " channels\n";
-    std::cout << "Sample data: ";
-    for (int i = 0; i < 1000; i++) {
-        std::cout << " " << samples[i];
-    }
-    std::cout << "\n";
-
-    std::cout << "Audio panning assignment by Tyler Feldman" << std::endl;
 
     // First, select an OpenCL platform to run on.  
     errNum = clGetPlatformIDs(0, NULL, &numPlatforms);
@@ -224,7 +225,6 @@ int main(int argc, char** argv)
     std::cout << "Number of frames: " << num_frames << "\n";
     errNum = clSetKernelArg(kernel, 1, sizeof(int), (void *)&num_frames);
 	checkErr(errNum, "clSetKernelArg(pan_audio_2channel)");
-    const float pan = 0.9;
     errNum = clSetKernelArg(kernel, 2, sizeof(float), (void *)&pan);
 	checkErr(errNum, "clSetKernelArg(pan_audio_2channel)");
 
@@ -274,32 +274,10 @@ int main(int argc, char** argv)
 		NULL,
 		NULL);
 
-    std::cout << "Sample data: ";
-    for (int i = 0; i < 1000; i++) {
-        std::cout << " " << samples[i];
+    const char* output_filepath = "output.wav";
+    if (write_wav_file(output_filepath, samples, sfinfo.samplerate, 2)) {
+        std::cout << "Stereo WAV file written successfully to: " << output_filepath << std::endl;
     }
-    std::cout << "\n";
-    std::cout << "Have " << samples.size() << " samples.\n";
-	std::cout << std::endl;
-
-    // sfinfo.format = original_format;
-    // sfinfo.frames = 0;
-    // const char* output_file = "output.wav";
-    // printf("Frames: %lld, Channels: %d, Format: 0x%x\n", 
-    //     sfinfo.frames, sfinfo.channels, sfinfo.format);
-    // SNDFILE* outFile = sf_open(output_file, SFM_WRITE, &sfinfo);
-    // if (!outFile) {
-    //     printf("Error opening output file %s: %s\n", output_file, sf_strerror(NULL));
-    //     return 1;
-    // }
-    // sf_writef_short(outFile, samples.data(), sfinfo.frames);
-    // sf_close(outFile);
-    // std::cout << "Wrote data to: " << output_file << "\n";
-    if (write_wav_file("output.wav", samples, sfinfo.samplerate, 2)) {
-        std::cout << "Stereo WAV file written successfully!" << std::endl;
-    }
-
-    std::cout << "Program completed successfully" << std::endl;
 
     return 0;
 }
