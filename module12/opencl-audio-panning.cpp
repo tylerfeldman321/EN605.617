@@ -4,12 +4,11 @@
 #include <string>
 #include <vector>
 
+#include <sndfile.h>
+
 #include "info.hpp"
 
 #define DEFAULT_PLATFORM 0
-#define DEFAULT_USE_MAP false
-
-#define NUM_BUFFER_ELEMENTS 16
 
 // Function to check and handle OpenCL errors
 inline void 
@@ -20,6 +19,32 @@ checkErr(cl_int err, const char * name)
         exit(EXIT_FAILURE);
     }
 }
+
+
+bool write_wav_file(const std::string& filename, const std::vector<short>& data, int sample_rate, int channels) {
+    SF_INFO sfinfo;
+    sfinfo.frames = data.size() / channels;
+    sfinfo.samplerate = sample_rate;
+    sfinfo.channels = channels;
+    sfinfo.format = SF_FORMAT_WAV | SF_FORMAT_PCM_16;
+
+    SNDFILE* outfile = sf_open(filename.c_str(), SFM_WRITE, &sfinfo);
+    if (!outfile) {
+        std::cerr << "Error opening file for writing: " << sf_strerror(NULL) << std::endl;
+        return false;
+    }
+
+    sf_count_t count = sf_write_short(outfile, data.data(), data.size());
+    if (count != static_cast<sf_count_t>(data.size())) {
+        std::cerr << "Error writing samples to file." << std::endl;
+        sf_close(outfile);
+        return false;
+    }
+
+    sf_close(outfile);
+    return true;
+}
+
 
 ///
 //	main() for simple buffer and sub-buffer example
@@ -33,21 +58,40 @@ int main(int argc, char** argv)
     cl_device_id * deviceIDs;
     cl_context context;
     cl_program program;
-    std::vector<cl_kernel> kernels;
-    std::vector<cl_command_queue> queues;
-    std::vector<cl_mem> buffers;
-    int * inputOutput;
 
     int platform = DEFAULT_PLATFORM; 
-    bool useMap  = DEFAULT_USE_MAP;
+
+    // Get wav file as an argument
+	if (argc < 2)
+	{	puts ("Apply panning to an input stereo wav file. ") ;
+		puts ("    Usage : generate <wav_file>\n") ;
+		exit (1) ;
+    };
+
+    // Load audio data
+    SF_INFO sfinfo;
+    SNDFILE* sndfile = sf_open(argv[1], SFM_READ, &sfinfo);
+    if (!sndfile) {
+        printf("Error opening input file %s: %s\n", argv[1], (NULL));
+        return 1;
+    }
+    std::vector<short> samples(sfinfo.frames * sfinfo.channels);
+    int original_format = sfinfo.format;
+    sf_readf_short(sndfile, samples.data(), sfinfo.frames);
+    sf_close(sndfile);
+    std::cout << "Loaded " << samples.size() << " samples.\n";
+    std::cout << "Loaded samples from " << sfinfo.channels << " channels\n";
+    std::cout << "Sample data: ";
+    for (int i = 0; i < 1000; i++) {
+        std::cout << " " << samples[i];
+    }
+    std::cout << "\n";
 
     std::cout << "Audio panning assignment by Tyler Feldman" << std::endl;
 
     // First, select an OpenCL platform to run on.  
     errNum = clGetPlatformIDs(0, NULL, &numPlatforms);
-    checkErr( 
-        (errNum != CL_SUCCESS) ? errNum : (numPlatforms <= 0 ? -1 : CL_SUCCESS), 
-        "clGetPlatformIDs"); 
+    checkErr( (errNum != CL_SUCCESS) ? errNum : (numPlatforms <= 0 ? -1 : CL_SUCCESS), "clGetPlatformIDs"); 
     platformIDs = (cl_platform_id *)alloca(
             sizeof(cl_platform_id) * numPlatforms);
     std::cout << "Number of platforms: \t" << numPlatforms << std::endl; 
@@ -57,8 +101,8 @@ int main(int argc, char** argv)
        "clGetPlatformIDs");
 
 	// Load program source file
-    std::ifstream srcFile("simple.cl");
-    checkErr(srcFile.is_open() ? CL_SUCCESS : -1, "reading simple.cl");
+    std::ifstream srcFile("pan-audio.cl");
+    checkErr(srcFile.is_open() ? CL_SUCCESS : -1, "reading pan-audio.cl");
 
     std::string srcProg(
         std::istreambuf_iterator<char>(srcFile),
@@ -142,38 +186,16 @@ int main(int argc, char** argv)
             std::cerr << buildLog;
             checkErr(errNum, "clBuildProgram");
     }
+    std::cout << "Built program successfully!\n";
 
-    // create buffers and sub-buffers
-    inputOutput = new int[NUM_BUFFER_ELEMENTS];
-    for (unsigned int i = 0; i < NUM_BUFFER_ELEMENTS; i++)
-    {
-        inputOutput[i] = i;
-    }
-
-    // create a single buffer to cover all the input data
+    // Create a buffer for our audio data
     cl_mem main_buffer = clCreateBuffer(
         context,
         CL_MEM_READ_WRITE,
-        sizeof(int) * NUM_BUFFER_ELEMENTS,
+        sizeof(short) * samples.size(),
         NULL,
         &errNum);
     checkErr(errNum, "clCreateBuffer");
-
-    // now for all devices other than the first create a sub-buffer
-	cl_buffer_region region = 
-		{
-			NUM_BUFFER_ELEMENTS * 0 * sizeof(int), 
-			NUM_BUFFER_ELEMENTS * sizeof(int)
-		};
-	cl_mem buffer = clCreateSubBuffer(
-		main_buffer,
-		CL_MEM_READ_WRITE,
-		CL_BUFFER_CREATE_TYPE_REGION,
-		&region,
-		&errNum);
-	checkErr(errNum, "clCreateSubBuffer");
-
-	buffers.push_back(buffer);
 
     // Create command queues
 	InfoDevice<cl_device_type>::display(
@@ -188,38 +210,44 @@ int main(int argc, char** argv)
 			0,
 			&errNum);
 	checkErr(errNum, "clCreateCommandQueue");
-	queues.push_back(queue);
 
 	cl_kernel kernel = clCreateKernel(
 		program,
-		"square",
+		"pan_audio_2channel",
 		&errNum);
-	checkErr(errNum, "clCreateKernel(square)");
+	checkErr(errNum, "clCreateKernel(pan_audio_2channel)");
 
-	errNum = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&buffers[0]);
-	checkErr(errNum, "clSetKernelArg(square)");
-
-	kernels.push_back(kernel);
+    // Set arguments
+	errNum = clSetKernelArg(kernel, 0, sizeof(cl_mem), (void *)&main_buffer);
+	checkErr(errNum, "clSetKernelArg(pan_audio_2channel)");
+    const int num_frames = sfinfo.frames;
+    std::cout << "Number of frames: " << num_frames << "\n";
+    errNum = clSetKernelArg(kernel, 1, sizeof(int), (void *)&num_frames);
+	checkErr(errNum, "clSetKernelArg(pan_audio_2channel)");
+    const float pan = 0.9;
+    errNum = clSetKernelArg(kernel, 2, sizeof(float), (void *)&pan);
+	checkErr(errNum, "clSetKernelArg(pan_audio_2channel)");
 
 	// Write input data
 	errNum = clEnqueueWriteBuffer(
-		queues[numDevices - 1],
+		queue,
 		main_buffer,
 		CL_TRUE,
 		0,
-		sizeof(int) * NUM_BUFFER_ELEMENTS * numDevices,
-		(void*)inputOutput,
+		sizeof(short) * samples.size(),
+		(void*)&samples[0],
 		0,
 		NULL,
 		NULL);
 
     std::vector<cl_event> events;
-    // call kernel for each device
+    
+    // Call the kernel
 	cl_event event;
-	size_t gWI = NUM_BUFFER_ELEMENTS;
+	size_t gWI = samples.size();
 	errNum = clEnqueueNDRangeKernel(
-		queues[0], 
-		kernels[0], 
+		queue, 
+		kernel,
 		1, 
 		NULL,
 		(const size_t*)&gWI, 
@@ -236,23 +264,40 @@ int main(int argc, char** argv)
 
 	// Read back computed data
 	clEnqueueReadBuffer(
-		queues[numDevices - 1],
+		queue,
 		main_buffer,
 		CL_TRUE,
 		0,
-		sizeof(int) * NUM_BUFFER_ELEMENTS * numDevices,
-		(void*)inputOutput,
+		sizeof(short) * samples.size(),
+		(void*)&samples[0],
 		0,
 		NULL,
 		NULL);
 
-    // Display output in rows
-	for (unsigned elems = 0 * NUM_BUFFER_ELEMENTS; elems < ((0+1) * NUM_BUFFER_ELEMENTS); elems++)
-	{
-		std::cout << " " << inputOutput[elems];
-	}
-
+    std::cout << "Sample data: ";
+    for (int i = 0; i < 1000; i++) {
+        std::cout << " " << samples[i];
+    }
+    std::cout << "\n";
+    std::cout << "Have " << samples.size() << " samples.\n";
 	std::cout << std::endl;
+
+    // sfinfo.format = original_format;
+    // sfinfo.frames = 0;
+    // const char* output_file = "output.wav";
+    // printf("Frames: %lld, Channels: %d, Format: 0x%x\n", 
+    //     sfinfo.frames, sfinfo.channels, sfinfo.format);
+    // SNDFILE* outFile = sf_open(output_file, SFM_WRITE, &sfinfo);
+    // if (!outFile) {
+    //     printf("Error opening output file %s: %s\n", output_file, sf_strerror(NULL));
+    //     return 1;
+    // }
+    // sf_writef_short(outFile, samples.data(), sfinfo.frames);
+    // sf_close(outFile);
+    // std::cout << "Wrote data to: " << output_file << "\n";
+    if (write_wav_file("output.wav", samples, sfinfo.samplerate, 2)) {
+        std::cout << "Stereo WAV file written successfully!" << std::endl;
+    }
 
     std::cout << "Program completed successfully" << std::endl;
 
